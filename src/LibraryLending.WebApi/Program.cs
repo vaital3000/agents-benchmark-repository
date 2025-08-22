@@ -5,9 +5,11 @@ using LibraryLending.Application.UseCases.Loans.LoanBook;
 using LibraryLending.Application.UseCases.Loans.ReturnBook;
 using LibraryLending.Application.UseCases.Patrons.GetPatron;
 using LibraryLending.Application.UseCases.Patrons.RegisterPatron;
+using LibraryLending.Application.Services;
 using LibraryLending.Domain.Repositories;
 using LibraryLending.Infrastructure.Data;
 using LibraryLending.Infrastructure.Repositories;
+using LibraryLending.Infrastructure.Services;
 using LibraryLending.WebApi.Middleware;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -26,13 +28,28 @@ builder.Services.AddMediatR(typeof(RegisterPatronCommand).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(RegisterPatronValidator).Assembly);
 
 // Add Entity Framework
-builder.Services.AddDbContext<LibraryDbContext>(options =>
-    options.UseInMemoryDatabase("LibraryLendingDb"));
+var connectionString = builder.Configuration.GetConnectionString("LibraryDb");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    builder.Services.AddDbContext<LibraryDbContext>(options =>
+        options.UseInMemoryDatabase("LibraryLendingDb"));
+}
+else
+{
+    builder.Services.AddDbContext<LibraryDbContext>(options =>
+        options.UseSqlServer(connectionString));
+}
 
 // Add repositories
 builder.Services.AddScoped<IBookRepository, BookRepository>();
 builder.Services.AddScoped<IPatronRepository, PatronRepository>();
 builder.Services.AddScoped<ILoanRepository, LoanRepository>();
+builder.Services.AddScoped<IOverdueNotificationRepository, OverdueNotificationRepository>();
+builder.Services.AddHttpClient<IEmailService, EmailService>(client =>
+{
+    var baseUrl = builder.Configuration["EmailService:BaseUrl"] ?? "http://localhost";
+    client.BaseAddress = new Uri(baseUrl);
+});
 
 var app = builder.Build();
 
@@ -85,3 +102,5 @@ static async Task SeedDataAsync(WebApplication app)
     
     await context.SaveChangesAsync();
 }
+
+public partial class Program { }
